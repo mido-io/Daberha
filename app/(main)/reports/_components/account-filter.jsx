@@ -47,6 +47,7 @@ function AccountFilterComponent({ accounts }) {
 
 export function AccountFilter({ accounts }) {
     const [mounted, setMounted] = useState(false);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     useEffect(() => setMounted(true), []);
 
     if (!mounted) return <div className="h-10 w-full md:w-[250px] bg-muted animate-pulse rounded-md" />;

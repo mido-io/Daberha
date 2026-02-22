@@ -52,6 +52,7 @@ export function BudgetProgress({ initialBudget, currentExpenses }) {
 
   useEffect(() => {
     if (updatedBudget?.success) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setIsEditing(false);
       toast.success("تم تحديث الميزانية بنجاح");
     }

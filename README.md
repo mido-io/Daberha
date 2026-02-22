@@ -1,4 +1,4 @@
-# دَبِّرها (Daberha) 💰
+# دَبِّرها (Daberha)
 
 **Daberha** is an Arabic-first, comprehensive personal finance and budget management application. Built to help users track expenses, manage budgets, and gain AI-powered insights into their financial habits with a clean, premium, and responsive user interface.
 
