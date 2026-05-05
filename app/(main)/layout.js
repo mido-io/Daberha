@@ -1,7 +1,11 @@
 import Header from '@/components/Header'
+import { checkUser } from '@/lib/checkUser'
 import React from 'react'
 
-const layout = ({ children }) => {
+const MainLayout = async ({ children }) => {
+    // Ensure the user exists in our database before accessing main routes
+    await checkUser();
+
     return (
         <div>
             <Header />
@@ -13,4 +17,4 @@ const layout = ({ children }) => {
     )
 }
 
-export default layout
+export default MainLayout
