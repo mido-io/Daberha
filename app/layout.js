@@ -50,13 +50,14 @@ export default async function RootLayout({ children }) {
       }}
     >
       <html lang={lang} dir={dir} className={`${inter.variable} ${ibmPlexSansArabic.variable}`}>
+
         <body className={lang === "ar" ? "font-arabic" : "font-sans"}>
           <NextTopLoader color="#4CAF50" showSpinner={false} zIndex={99999} />
           <Header />
           <main className="min-h-screen bg-background pt-16">{children}</main>
           <Toaster richColors />
-          <FloatingAddButton />
         </body>
+
       </html>
     </ClerkProvider>
   );
