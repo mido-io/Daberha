@@ -1,6 +1,6 @@
+"use server";
 
-
-import { db } from "@/lib/prisma";
+import { supabase } from "@/lib/supabase";
 import { subDays } from "date-fns";
 
 const ACCOUNT_ID = "account-id";
@@ -48,7 +48,7 @@ export async function seedTransactions() {
     let totalBalance = 0;
 
     for (let i = 90; i >= 0; i--) {
-      const date = subDays(new Date(), i);
+      const date = subDays(new Date(), i).toISOString();
 
       // Generate 1-3 transactions per day
       const transactionsPerDay = Math.floor(Math.random() * 3) + 1;
@@ -59,18 +59,14 @@ export async function seedTransactions() {
         const { category, amount } = getRandomCategory(type);
 
         const transaction = {
-          id: crypto.randomUUID(),
           type,
           amount,
-          description: `${type === "INCOME" ? "Received" : "Paid for"
-            } ${category}`,
+          description: `${type === "INCOME" ? "Received" : "Paid for"} ${category}`,
           date,
           category,
           status: "COMPLETED",
-          userId: USER_ID,
-          accountId: ACCOUNT_ID,
-          createdAt: date,
-          updatedAt: date,
+          user_id: USER_ID,
+          account_id: ACCOUNT_ID,
         };
 
         totalBalance += type === "INCOME" ? amount : -amount;
@@ -78,24 +74,28 @@ export async function seedTransactions() {
       }
     }
 
-    // Insert transactions in batches and update account balance
-    await db.$transaction(async (tx) => {
-      // Clear existing transactions
-      await tx.transaction.deleteMany({
-        where: { accountId: ACCOUNT_ID },
-      });
+    // Clear existing transactions
+    const { error: deleteError } = await supabase
+      .from("transactions")
+      .delete()
+      .eq("account_id", ACCOUNT_ID);
 
-      // Insert new transactions
-      await tx.transaction.createMany({
-        data: transactions,
-      });
+    if (deleteError) throw new Error(`Delete error: ${deleteError.message}`);
 
-      // Update account balance
-      await tx.account.update({
-        where: { id: ACCOUNT_ID },
-        data: { balance: totalBalance },
-      });
-    });
+    // Insert new transactions
+    const { error: insertError } = await supabase
+      .from("transactions")
+      .insert(transactions);
+
+    if (insertError) throw new Error(`Insert error: ${insertError.message}`);
+
+    // Update account balance
+    const { error: updateError } = await supabase
+      .from("accounts")
+      .update({ balance: totalBalance })
+      .eq("id", ACCOUNT_ID);
+
+    if (updateError) throw new Error(`Update error: ${updateError.message}`);
 
     return {
       success: true,

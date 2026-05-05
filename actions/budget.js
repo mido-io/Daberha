@@ -1,6 +1,6 @@
 "use server";
 
-import { db } from "@/lib/prisma";
+import { supabase } from "@/lib/supabase";
 import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
 
@@ -9,19 +9,26 @@ export async function getCurrentBudget(accountId) {
     const { userId } = await auth();
     if (!userId) throw new Error("Unauthorized");
 
-    const user = await db.user.findUnique({
-      where: { clerkUserId: userId },
-    });
+    const { data: user, error: userError } = await supabase
+      .from("users")
+      .select("id")
+      .eq("clerk_user_id", userId)
+      .single();
 
-    if (!user) {
+    if (userError || !user) {
       throw new Error("User not found");
     }
 
-    const budget = await db.budget.findFirst({
-      where: {
-        userId: user.id,
-      },
-    });
+    const { data: budget, error: budgetError } = await supabase
+      .from("budgets")
+      .select("*")
+      .eq("user_id", user.id)
+      .limit(1)
+      .maybeSingle();
+
+    if (budgetError) {
+      console.error("Error fetching budget:", budgetError);
+    }
 
     // Get current month's expenses
     const currentDate = new Date();
@@ -29,33 +36,46 @@ export async function getCurrentBudget(accountId) {
       currentDate.getFullYear(),
       currentDate.getMonth(),
       1
-    );
+    ).toISOString();
+    
     const endOfMonth = new Date(
       currentDate.getFullYear(),
       currentDate.getMonth() + 1,
-      0
-    );
+      0,
+      23, 59, 59, 999
+    ).toISOString();
 
-    const expenses = await db.transaction.aggregate({
-      where: {
-        userId: user.id,
-        type: "EXPENSE",
-        date: {
-          gte: startOfMonth,
-          lte: endOfMonth,
-        },
-        accountId,
-      },
-      _sum: {
-        amount: true,
-      },
-    });
+    let query = supabase
+      .from("transactions")
+      .select("amount")
+      .eq("user_id", user.id)
+      .eq("type", "EXPENSE")
+      .gte("date", startOfMonth)
+      .lte("date", endOfMonth);
+
+    if (accountId) {
+      query = query.eq("account_id", accountId);
+    }
+
+    const { data: expensesData, error: expensesError } = await query;
+
+    if (expensesError) {
+      console.error("Error fetching expenses:", expensesError);
+    }
+
+    const totalExpenses = expensesData
+      ? expensesData.reduce((sum, tx) => sum + Number(tx.amount), 0)
+      : 0;
 
     return {
-      budget: budget ? { ...budget, amount: budget.amount.toNumber() } : null,
-      currentExpenses: expenses._sum.amount
-        ? expenses._sum.amount.toNumber()
-        : 0,
+      budget: budget ? {
+        ...budget,
+        amount: Number(budget.amount),
+        userId: budget.user_id,
+        createdAt: budget.created_at,
+        updatedAt: budget.updated_at,
+      } : null,
+      currentExpenses: totalExpenses,
     };
   } catch (error) {
     console.error("Error fetching budget:", error);
@@ -68,30 +88,39 @@ export async function updateBudget(amount) {
     const { userId } = await auth();
     if (!userId) throw new Error("Unauthorized");
 
-    const user = await db.user.findUnique({
-      where: { clerkUserId: userId },
-    });
+    const { data: user, error: userError } = await supabase
+      .from("users")
+      .select("id")
+      .eq("clerk_user_id", userId)
+      .single();
 
-    if (!user) throw new Error("User not found");
+    if (userError || !user) throw new Error("User not found");
 
     // Update or create budget
-    const budget = await db.budget.upsert({
-      where: {
-        userId: user.id,
-      },
-      update: {
-        amount,
-      },
-      create: {
-        userId: user.id,
-        amount,
-      },
-    });
+    const { data: budget, error: budgetError } = await supabase
+      .from("budgets")
+      .upsert(
+        {
+          user_id: user.id,
+          amount,
+        },
+        { onConflict: "user_id" }
+      )
+      .select()
+      .single();
+
+    if (budgetError) throw new Error(budgetError.message);
 
     revalidatePath("/dashboard");
     return {
       success: true,
-      data: { ...budget, amount: budget.amount.toNumber() },
+      data: {
+        ...budget,
+        amount: Number(budget.amount),
+        userId: budget.user_id,
+        createdAt: budget.created_at,
+        updatedAt: budget.updated_at,
+      },
     };
   } catch (error) {
     console.error("Error updating budget:", error);

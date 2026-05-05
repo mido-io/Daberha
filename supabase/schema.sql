@@ -265,7 +265,166 @@ insert into achievements (key, name_ar, name_en, description_ar, emoji, xp_rewar
   ('shared_goal',        'قوة الجماعة',   'Team Player',      'انضممت لهدف مشترك',               '🤝', 150)
 on conflict (key) do nothing;
 
+-- ─── RPCs (Stored Procedures) ───────────────────────────────────
+-- Create a new transaction and update account balance atomically
+create or replace function create_transaction_rpc(
+  p_user_id text,
+  p_account_id text,
+  p_type transaction_type,
+  p_amount numeric,
+  p_description text,
+  p_category text,
+  p_receipt_url text,
+  p_status transaction_status,
+  p_is_recurring boolean,
+  p_recurring_interval recurring_interval,
+  p_next_recurring_date timestamptz,
+  p_date timestamptz
+) returns jsonb language plpgsql as $$
+declare
+  v_transaction_id text;
+  v_balance_change numeric;
+  v_new_transaction jsonb;
+begin
+  -- Calculate balance change
+  if p_type = 'EXPENSE' then
+    v_balance_change := -p_amount;
+  else
+    v_balance_change := p_amount;
+  end if;
+
+  -- Insert transaction
+  insert into transactions (
+    type, amount, description, category, receipt_url, status, 
+    is_recurring, recurring_interval, next_recurring_date, 
+    date, user_id, account_id
+  ) values (
+    p_type, p_amount, p_description, p_category, p_receipt_url, p_status,
+    p_is_recurring, p_recurring_interval, p_next_recurring_date,
+    p_date, p_user_id, p_account_id
+  ) returning id into v_transaction_id;
+
+  -- Update account balance
+  update accounts
+  set balance = balance + v_balance_change,
+      updated_at = now()
+  where id = p_account_id and user_id = p_user_id;
+
+  -- Return the created transaction
+  select to_jsonb(t) into v_new_transaction from transactions t where id = v_transaction_id;
+  return v_new_transaction;
+end;
+$$;
+
+-- Update transaction and account balance atomically
+create or replace function update_transaction_rpc(
+  p_transaction_id text,
+  p_user_id text,
+  p_account_id text,
+  p_type transaction_type,
+  p_amount numeric,
+  p_description text,
+  p_category text,
+  p_receipt_url text,
+  p_status transaction_status,
+  p_is_recurring boolean,
+  p_recurring_interval recurring_interval,
+  p_next_recurring_date timestamptz,
+  p_date timestamptz
+) returns jsonb language plpgsql as $$
+declare
+  v_old_type transaction_type;
+  v_old_amount numeric;
+  v_old_balance_change numeric;
+  v_new_balance_change numeric;
+  v_net_balance_change numeric;
+  v_updated_transaction jsonb;
+begin
+  -- Get old transaction details
+  select type, amount into v_old_type, v_old_amount 
+  from transactions 
+  where id = p_transaction_id and user_id = p_user_id;
+
+  if not found then
+    raise exception 'Transaction not found';
+  end if;
+
+  -- Calculate balance changes
+  if v_old_type = 'EXPENSE' then
+    v_old_balance_change := -v_old_amount;
+  else
+    v_old_balance_change := v_old_amount;
+  end if;
+
+  if p_type = 'EXPENSE' then
+    v_new_balance_change := -p_amount;
+  else
+    v_new_balance_change := p_amount;
+  end if;
+
+  v_net_balance_change := v_new_balance_change - v_old_balance_change;
+
+  -- Update transaction
+  update transactions set
+    type = p_type,
+    amount = p_amount,
+    description = p_description,
+    category = p_category,
+    receipt_url = p_receipt_url,
+    status = p_status,
+    is_recurring = p_is_recurring,
+    recurring_interval = p_recurring_interval,
+    next_recurring_date = p_next_recurring_date,
+    date = p_date,
+    updated_at = now()
+  where id = p_transaction_id and user_id = p_user_id;
+
+  -- Update account balance
+  update accounts
+  set balance = balance + v_net_balance_change,
+      updated_at = now()
+  where id = p_account_id and user_id = p_user_id;
+
+  -- Return the updated transaction
+  select to_jsonb(t) into v_updated_transaction from transactions t where id = p_transaction_id;
+  return v_updated_transaction;
+end;
+$$;
+
+-- Bulk delete transactions and update account balances atomically
+create or replace function bulk_delete_transactions_rpc(
+  p_transaction_ids text[],
+  p_user_id text
+) returns boolean language plpgsql as $$
+declare
+  v_rec record;
+  v_balance_change numeric;
+begin
+  -- Loop through the transactions to calculate balance changes
+  for v_rec in 
+    select account_id, type, amount 
+    from transactions 
+    where id = any(p_transaction_ids) and user_id = p_user_id
+  loop
+    if v_rec.type = 'EXPENSE' then
+      v_balance_change := v_rec.amount; -- Reverse expense -> add balance
+    else
+      v_balance_change := -v_rec.amount; -- Reverse income -> subtract balance
+    end if;
+
+    -- Update account balance
+    update accounts
+    set balance = balance + v_balance_change,
+        updated_at = now()
+    where id = v_rec.account_id and user_id = p_user_id;
+  end loop;
+
+  -- Delete the transactions
+  delete from transactions 
+  where id = any(p_transaction_ids) and user_id = p_user_id;
+
+  return true;
+end;
+$$;
+
 -- ─── Done ─────────────────────────────────────────────────
--- Tables: users, accounts, transactions, budgets,
---         goals, goal_members, achievements, user_achievements
--- Run `npx prisma db pull` after connecting to sync Prisma client.
