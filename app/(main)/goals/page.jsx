@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Target, Users, Plus } from "lucide-react";
 import Link from "next/link";
 import { format } from "date-fns";
+import { EmptyState } from "@/components/EmptyState";
 
 export const metadata = {
   title: "Goals - Daberha",
@@ -46,20 +47,13 @@ export default async function GoalsPage() {
       </div>
 
       {!hasGoals && (
-        <Card className="border-dashed shadow-none bg-slate-50/50">
-          <CardContent className="flex flex-col items-center justify-center p-12 text-center">
-            <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mb-4">
-              <Target className="w-8 h-8 text-primary" />
-            </div>
-            <h3 className="font-semibold text-lg text-slate-900 mb-2">No goals yet</h3>
-            <p className="text-sm text-slate-500 mb-6 max-w-sm">
-              Start saving for a vacation, a new gadget, or an emergency fund. Share goals with friends to save together!
-            </p>
-            <Link href="/goals/create">
-              <Button>Create Your First Goal</Button>
-            </Link>
-          </CardContent>
-        </Card>
+        <EmptyState 
+          icon={<Target className="w-8 h-8" />}
+          title="لا توجد أهداف حالياً"
+          description="ابدأ بتحديد أهدافك المالية، سواء كانت للسفر، جهاز جديد، أو لتكوين مدخرات للطوارئ. يمكنك أيضاً مشاركة الأهداف مع العائلة!"
+          actionLabel="إنشاء أول هدف"
+          actionHref="/goals/create"
+        />
       )}
 
       {owned.length > 0 && (
