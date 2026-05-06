@@ -14,6 +14,7 @@ const navItems = [
   { href: "/dashboard", label: "الرئيسية" },
   { href: "/budget", label: "الميزانية" },
   { href: "/transaction", label: "المصاريف" },
+  { href: "/goals", label: "الأهداف" },
   { href: "/reports", label: "التقارير" },
 ];
 
