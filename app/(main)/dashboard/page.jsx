@@ -6,14 +6,19 @@ import { AccountCard } from "./_components/account-card";
 import CreateAccountDrawer from "@/components/CreateAccountDrawer";
 import { BudgetProgress } from "./_components/budget-progress";
 import { Card, CardContent } from "@/components/ui/card";
-import { Plus } from "lucide-react";
+import { Plus, Flame, ChevronLeft } from "lucide-react";
 import { DashboardOverview } from "./_components/transaction-overview";
+import { trackDailyActivity } from "@/actions/gamification";
+import Link from "next/link";
 
 export default async function DashboardPage() {
-  const [accounts, transactions] = await Promise.all([
+  const [accounts, transactions, trackResult] = await Promise.all([
     getUserAccounts(),
     getDashboardData(),
+    trackDailyActivity(),
   ]);
+
+  const streakDays = trackResult?.streakDays || 0;
 
   const defaultAccount = accounts?.find((account) => account.isDefault);
 
@@ -30,6 +35,24 @@ export default async function DashboardPage() {
         initialBudget={budgetData?.budget}
         currentExpenses={budgetData?.currentExpenses || 0}
       />
+
+      {/* Streak Card Wide */}
+      <Link href="/leaderboard" className="block">
+        <div className="bg-white border border-border rounded-2xl p-4 flex items-center gap-4 hover:shadow-sm transition-shadow">
+          <div className="w-12 h-12 bg-[#FFF0EA] rounded-xl flex items-center justify-center text-[#FF6B35] shrink-0">
+            <Flame className="w-7 h-7 fill-current" />
+          </div>
+          <div className="flex-1 font-arabic">
+            <div className="text-sm font-bold text-foreground">
+              سلسلة {streakDays} يوم 🔥
+            </div>
+            <div className="text-xs text-muted-foreground mt-0.5">
+              استمر في تسجيل نشاطك لزيادة نقاطك
+            </div>
+          </div>
+          <ChevronLeft className="w-5 h-5 text-muted-foreground" />
+        </div>
+      </Link>
 
       {/* Dashboard Overview */}
       <DashboardOverview

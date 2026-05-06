@@ -1,5 +1,6 @@
 import Header from '@/components/Header'
 import { checkUser } from '@/lib/checkUser'
+import { NotificationPrimer } from "@/components/NotificationPrimer";
 import React from 'react'
 
 const MainLayout = async ({ children }) => {
@@ -7,9 +8,9 @@ const MainLayout = async ({ children }) => {
     await checkUser();
 
     return (
-        <div>
+        <div className="font-arabic pb-20">
+            <NotificationPrimer />
             <Header />
-
             <main>
                 {children}
             </main>

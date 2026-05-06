@@ -11,7 +11,8 @@ import {
 } from "recharts";
 import { format } from "date-fns";
 import { ar } from "date-fns/locale";
-import { ArrowUpRight, ArrowDownRight } from "lucide-react";
+import { ArrowUpRight, ArrowDownRight, ReceiptText, PieChart as PieChartIcon } from "lucide-react";
+import { EmptyState } from "@/components/EmptyState";
 
 import {
   Select,
@@ -110,9 +111,13 @@ export function DashboardOverview({ accounts, transactions }) {
         <CardContent>
           <div className="space-y-4">
             {recentTransactions.length === 0 ? (
-              <p className="text-center text-muted-foreground py-4 text-sm font-arabic">
-                لا توجد معاملات حديثة
-              </p>
+              <EmptyState 
+                icon={<ReceiptText className="w-8 h-8" />}
+                title="لا توجد معاملات حديثة"
+                description="ابدأ بتسجيل أول معاملة مالية لك لتتبع مصاريفك."
+                actionLabel="إضافة معاملة"
+                actionHref="/transaction/create"
+              />
             ) : (
               recentTransactions.map((transaction) => (
                 <div
@@ -160,9 +165,11 @@ export function DashboardOverview({ accounts, transactions }) {
         </CardHeader>
         <CardContent className="p-0 pb-5">
           {pieChartData.length === 0 ? (
-            <p className="text-center text-muted-foreground py-4 font-arabic">
-              لا توجد مصروفات هذا الشهر
-            </p>
+            <EmptyState 
+              icon={<PieChartIcon className="w-8 h-8" />}
+              title="لا توجد مصروفات"
+              description="لم تقم بتسجيل أي مصروفات هذا الشهر."
+            />
           ) : (
             <div className="h-[300px] font-arabic" dir="ltr">
               <ResponsiveContainer width="100%" height="100%">
